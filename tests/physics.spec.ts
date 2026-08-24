@@ -120,6 +120,60 @@ describe('draw shot', () => {
   });
 });
 
+describe('cut + draw (뒤돌려치기)', () => {
+  function setupCut(w: World): { cue: BallState; obj: BallState } {
+    const cue = w.ballById('white');
+    const obj = w.ballById('red');
+    cue.pos.set(0, UP_R, 0);
+    obj.pos.set(0.42, UP_R, -0.03);
+    parkOthers(w, cue, obj);
+    return { cue, obj };
+  }
+
+  function cutShot(aFactor: number): number {
+    const w = World.initial();
+    setupCut(w);
+    applyStrike(w.ballById('white'), {
+      dir: new THREE.Vector3(1, 0, 0),
+      Vcue: 5,
+      a: aFactor * BALL_RADIUS,
+      b: 0,
+    });
+    for (let t = 0; t < 0.9; t += 1 / 60) w.step(1 / 60);
+    return w.ballById('white').pos.x;
+  }
+
+  it('draw finishes behind center hit, follow ahead of it', () => {
+    const draw = cutShot(-0.45);
+    const center = cutShot(0);
+    const follow = cutShot(+0.45);
+    expect(draw).toBeLessThan(center - 0.08);
+    expect(follow).toBeGreaterThan(center + 0.05);
+  });
+
+  it('strong draw reverses cue ball after the cut contact', () => {
+    const w = World.initial();
+    const { cue } = setupCut(w);
+    applyStrike(cue, {
+      dir: new THREE.Vector3(1, 0, 0),
+      Vcue: 5,
+      a: -0.45 * BALL_RADIUS,
+      b: 0,
+    });
+    let hitX = -1;
+    for (let t = 0; t < 3 && hitX < 0; ) {
+      const dt = 0.002;
+      w.step(dt, (ev) => {
+        if (ev.kind === 'ball') hitX = cue.pos.x;
+      });
+      t += dt;
+    }
+    expect(hitX).toBeGreaterThan(0);
+    for (let t = 0; t < 0.6; t += 0.002) w.step(0.002);
+    expect(cue.vel.x).toBeLessThan(-0.05);
+  });
+});
+
 describe('side spin off cushion', () => {
   function reboundVz(spinY: number): number {
     const w = World.initial();
@@ -138,6 +192,50 @@ describe('side spin off cushion', () => {
     expect(plus).toBeGreaterThan(0.02);
     expect(minus).toBeLessThan(-0.02);
     expect(Math.abs(plus)).toBeCloseTo(Math.abs(minus), 2);
+  });
+});
+
+describe('elevated cue curve (커브/스웨브)', () => {
+  function curveShot(elevDeg: number, bFactor: number): number {
+    const w = World.initial();
+    const cue = w.ballById('white');
+    parkOthers(w, cue);
+    cue.pos.set(0, UP_R, 0);
+    applyStrike(cue, {
+      dir: new THREE.Vector3(1, 0, 0),
+      Vcue: 6,
+      a: 0,
+      b: bFactor * BALL_RADIUS,
+      elev: (elevDeg * Math.PI) / 180,
+    });
+    for (let t = 0; t < 0.4; t += 1 / 60) w.step(1 / 60);
+    return cue.pos.z;
+  }
+
+  it('level cue produces no swerve regardless of english', () => {
+    expect(Math.abs(curveShot(0, 0.45))).toBeLessThan(0.02);
+  });
+
+  it('elevated right english swerves left during slide', () => {
+    expect(curveShot(45, 0.45)).toBeLessThan(-0.05);
+  });
+
+  it('elevated left english swerves right', () => {
+    expect(curveShot(45, -0.45)).toBeGreaterThan(0.05);
+  });
+
+  it('elevation reduces delivered speed by cos factor', () => {
+    const w = World.initial();
+    const cue = w.ballById('white');
+    applyStrike(cue, {
+      dir: new THREE.Vector3(1, 0, 0),
+      Vcue: 4,
+      a: 0,
+      b: 0,
+      elev: Math.PI / 3,
+    });
+    const expected = 4 * strikeEfficiency(0, 0) * Math.cos(Math.PI / 3);
+    expect(cue.vel.x).toBeCloseTo(expected, 9);
   });
 });
 

@@ -5,6 +5,7 @@ export type CueSelect = 'white' | 'yellow';
 export interface HudCallbacks {
   onPower: (p: number) => void;
   onTip: (a: number, b: number) => void;
+  onElev: (deg: number) => void;
   onShoot: () => void;
   onReset: () => void;
   onCueSelect: (id: CueSelect) => void;
@@ -14,6 +15,7 @@ export interface Hud {
   setStatus: (text: string) => void;
   setPower: (p: number) => void;
   setTip: (a: number, b: number) => void;
+  setElev: (deg: number) => void;
   setCueActive: (id: CueSelect) => void;
   toggleHelp: () => void;
   powerToSpeed: (p: number) => number;
@@ -40,6 +42,16 @@ export function createHud(root: HTMLElement, cbs: HudCallbacks): Hud {
   powerSlider.value = '50';
   const powerWrap = el('block');
   powerWrap.append(powerLabel, powerSlider);
+
+  const elevLabel = el('label');
+  const elevSlider = document.createElement('input');
+  elevSlider.type = 'range';
+  elevSlider.min = '0';
+  elevSlider.max = '60';
+  elevSlider.step = '1';
+  elevSlider.value = '0';
+  const elevWrap = el('block');
+  elevWrap.append(elevLabel, elevSlider);
 
   const padLabel = el('label');
   padLabel.textContent = '타격점 (영어)';
@@ -69,13 +81,14 @@ export function createHud(root: HTMLElement, cbs: HudCallbacks): Hud {
 
   const camLabel = el('hint');
   camLabel.innerHTML =
-    '카메라: <b>1</b> 탑다운 · <b>2</b> 큐 뒤 · <b>3</b> 자유<br>휠 줌 · 우클릭 드래그 = 타격점';
-  panel.append(powerWrap, padWrap, btnRow, cueBlock, camLabel);
+    '카메라: <b>1</b> 탑다운 · <b>2</b> 큐 뒤 · <b>3</b> 자유<br>휠 줌 · 우클릭 드래그 = 타격점<br>PgUp/PgDn = 큐 각도(커브)';
+  panel.append(powerWrap, elevWrap, padWrap, btnRow, cueBlock, camLabel);
 
   root.append(status, panel);
   root.classList.add('hud-root');
 
   let power = 50;
+  let elevDeg = 0;
   let tipA = 0;
   let tipB = 0;
 
@@ -119,6 +132,10 @@ export function createHud(root: HTMLElement, cbs: HudCallbacks): Hud {
     powerLabel.textContent = `파워 ${power} — ${powerToSpeed(power).toFixed(2)} m/s`;
   };
 
+  const updateElevLabel = (): void => {
+    elevLabel.textContent = elevDeg > 0 ? `큐 각도 ${elevDeg}° (커브)` : '큐 각도 0° (수평)';
+  };
+
   const updatePadHint = (): void => {
     const aR = tipA / BALL_RADIUS;
     const bR = tipB / BALL_RADIUS;
@@ -132,6 +149,11 @@ export function createHud(root: HTMLElement, cbs: HudCallbacks): Hud {
     power = Number(powerSlider.value);
     updatePowerLabel();
     cbs.onPower(power);
+  });
+  elevSlider.addEventListener('input', () => {
+    elevDeg = Number(elevSlider.value);
+    updateElevLabel();
+    cbs.onElev(elevDeg);
   });
   shootBtn.addEventListener('click', () => cbs.onShoot());
   resetBtn.addEventListener('click', () => cbs.onReset());
@@ -171,6 +193,7 @@ export function createHud(root: HTMLElement, cbs: HudCallbacks): Hud {
   });
 
   updatePowerLabel();
+  updateElevLabel();
   updatePadHint();
   drawPad();
 
@@ -194,6 +217,11 @@ export function createHud(root: HTMLElement, cbs: HudCallbacks): Hud {
       tipB = b;
       drawPad();
       updatePadHint();
+    },
+    setElev: (deg) => {
+      elevDeg = deg;
+      elevSlider.value = String(deg);
+      updateElevLabel();
     },
     setCueActive,
     toggleHelp: () => {

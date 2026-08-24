@@ -28,3 +28,6 @@ export const SPIN_STOP_EPS = 0.02;
 export const MAX_SUBSTEP = 0.002;
 export const POSITION_SLOP = 1e-7;
 export const MAX_EVENTS_PER_STEP = 64;
+
+export const MAX_ELEVATION = Math.PI / 3;
+export const MIN_ELEVATION = 0;

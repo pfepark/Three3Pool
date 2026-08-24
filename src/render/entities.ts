@@ -121,11 +121,13 @@ export class Entities {
     }
   }
 
-  setCueAim(origin: THREE.Vector3, dir: THREE.Vector3, pull: number, visible: boolean): void {
+  setCueAim(origin: THREE.Vector3, dir: THREE.Vector3, pull: number, visible: boolean, elev = 0): void {
     this.stick.visible = visible;
     if (!visible) return;
     this.stick.position.copy(origin);
+    this.stick.rotation.order = 'YXZ';
     this.stick.rotation.y = Math.atan2(dir.x, dir.z);
+    this.stick.rotation.x = elev;
     this.stickInner.position.z = -pull;
   }
 

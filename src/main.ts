@@ -19,7 +19,7 @@ const MOUSE_SENS = 0.0025;
 const MOUSE_FINE = 0.0005;
 
 const STATUS_AIM =
-  '마우스 좌우 = 조준 · ↑↓ 파워 · 우클릭 드래그 타격점 · Space 발사';
+  '마우스 좌우 = 조준 · ↑↓ 파워 · 우클릭 드래그 타격점 · PgUp/PgDn 큐각도 · Space 발사';
 
 type State = 'aim' | 'run';
 
@@ -35,6 +35,7 @@ let world = World.initial();
 let state: State = 'aim';
 const aimDir = new THREE.Vector3(1, 0, 0);
 let power = 50;
+let elevDeg = 0;
 let tipA = 0;
 let tipB = 0;
 let selectedCue: CueSelect = 'white';
@@ -50,6 +51,10 @@ const hud = createHud(hudRoot, {
   onTip: (a, b) => {
     tipA = a;
     tipB = b;
+    markDirty();
+  },
+  onElev: (deg) => {
+    elevDeg = deg;
     markDirty();
   },
   onShoot: () => shoot(),
@@ -69,6 +74,7 @@ function strikeParams() {
     Vcue: powerToSpeed(power),
     a: tipA,
     b: tipB,
+    elev: (elevDeg * Math.PI) / 180,
     cueId: selectedCue,
   };
 }
@@ -80,7 +86,7 @@ function markDirty(): void {
 function refreshPrediction(): void {
   currentPrediction = predict(world, strikeParams());
   entities.updatePrediction(currentPrediction);
-  entities.setCueAim(cueBall().pos, aimDir, 0.03 + power * 0.0018, true);
+  entities.setCueAim(cueBall().pos, aimDir, 0.03 + power * 0.0018, true, (elevDeg * Math.PI) / 180);
   predictionDirty = false;
 }
 
@@ -114,6 +120,13 @@ function adjustPower(delta: number): void {
   if (state !== 'aim') return;
   power = Math.min(100, Math.max(0, power + delta));
   hud.setPower(power);
+  markDirty();
+}
+
+function adjustElev(delta: number): void {
+  if (state !== 'aim') return;
+  elevDeg = Math.min(60, Math.max(0, elevDeg + delta));
+  hud.setElev(elevDeg);
   markDirty();
 }
 
@@ -215,6 +228,12 @@ window.addEventListener('keydown', (e) => {
   } else if (e.code === 'ArrowRight') {
     e.preventDefault();
     rotateAim(e.shiftKey ? AIM_FINE : AIM_STEP);
+  } else if (e.code === 'PageUp') {
+    e.preventDefault();
+    adjustElev(e.shiftKey ? 1 : 5);
+  } else if (e.code === 'PageDown') {
+    e.preventDefault();
+    adjustElev(e.shiftKey ? -1 : -5);
   } else if (e.code === 'KeyQ') rotateAim(e.shiftKey ? -AIM_FINE : -AIM_STEP);
   else if (e.code === 'KeyE') rotateAim(e.shiftKey ? AIM_FINE : AIM_STEP);
   else if (e.code === 'Digit1') setCamMode(1);
@@ -245,7 +264,7 @@ bundle.renderer.setAnimationLoop(() => {
     refreshPrediction();
   }
   if (state === 'aim' && !predictionDirty && currentPrediction) {
-    entities.setCueAim(cueBall().pos, aimDir, 0.03 + power * 0.0018, true);
+    entities.setCueAim(cueBall().pos, aimDir, 0.03 + power * 0.0018, true, (elevDeg * Math.PI) / 180);
   }
   if (camMode === 3) bundle.controls.update();
   bundle.renderer.render(bundle.scene, bundle.camera);
