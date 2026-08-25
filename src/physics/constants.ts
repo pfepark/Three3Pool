@@ -12,7 +12,7 @@ export const CUSHION_HEIGHT_OFFSET = 0.25 * BALL_RADIUS;
 export const CUSHION_REACH = Math.sqrt(
   BALL_RADIUS * BALL_RADIUS - CUSHION_HEIGHT_OFFSET * CUSHION_HEIGHT_OFFSET,
 );
-export const CUSHION_DYN_ARM = 0.12 * BALL_RADIUS;
+export const CUSHION_DYN_ARM = 0.05 * BALL_RADIUS;
 
 export const E_BALL_BALL = 0.95;
 export const E_CUSHION = 0.85;

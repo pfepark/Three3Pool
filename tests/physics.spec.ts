@@ -240,6 +240,33 @@ describe('elevated cue curve (커브/스웨브)', () => {
 });
 
 describe('lesson techniques', () => {
+  it('실전 득점 궤적: 초기 배치에서 오브젝트 타격 후 3쿠션 완주', () => {
+    const w = World.initial();
+    const cue = w.ballById('white');
+    const ang = Math.atan2(0.71, 0.19) - (3 * Math.PI) / 180;
+    applyStrike(cue, {
+      dir: new THREE.Vector3(Math.sin(ang), 0, Math.cos(ang)),
+      Vcue: 6.5,
+      a: 0,
+      b: 0.35 * BALL_RADIUS,
+    });
+    let ballHits = 0;
+    let cueCushions = 0;
+    let settled = false;
+    for (let t = 0; t < 6 && !settled; ) {
+      w.step(1 / 60, (ev) => {
+        if (ev.kind === 'ball') ballHits++;
+        else if (w.balls[ev.i].id === 'white') cueCushions++;
+      });
+      t += 1 / 60;
+      if (w.isSettled()) settled = true;
+    }
+    expect(ballHits).toBeGreaterThanOrEqual(1);
+    expect(cueCushions).toBeGreaterThanOrEqual(3);
+    const distToRed = cue.pos.distanceTo(w.ballById('red').pos);
+    expect(distToRed).toBeLessThan(1.5);
+  });
+
   function sideThroughObject(bFactor: number): {
     wyAfterHit: number;
     hitBall: boolean;
