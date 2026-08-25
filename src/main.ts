@@ -11,15 +11,15 @@ import { createHud, powerToSpeed, type CueSelect } from './ui/hud';
 
 const UP_Y = new THREE.Vector3(0, 1, 0);
 const MAX_TIP = 0.45 * BALL_RADIUS;
-const AIM_STEP = 0.004;
-const AIM_FINE = 0.0008;
+const AIM_ROT_SPEED = 1.5;
+const AIM_ROT_FINE = 0.08;
 const POWER_STEP = 3;
 const TIP_DRAG_SCALE = MAX_TIP / 120;
 const MOUSE_SENS = 0.0025;
 const MOUSE_FINE = 0.0005;
 
 const STATUS_AIM =
-  '마우스 좌우 = 조준 · ↑↓ 파워 · 우클릭 드래그 타격점 · PgUp/PgDn 큐각도 · Space 발사';
+  '빈 곳 클릭 = 조준 · ←→ 미세조준 · ↑↓ 파워 · 우클릭 드래그 타격점 · Space 발사';
 
 type State = 'aim' | 'run';
 
@@ -182,6 +182,36 @@ bundle.renderer.domElement.addEventListener('pointerleave', () => {
   lastPointerX = null;
 });
 
+const AIM_CLICK_SLOP = 6;
+let aimClickDown: { x: number; y: number } | null = null;
+
+const aimRaycaster = new THREE.Raycaster();
+const aimPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -BALL_RADIUS);
+const aimPoint = new THREE.Vector3();
+const AIM_NDC = new THREE.Vector2();
+
+function aimAtPoint(e: PointerEvent): void {
+  AIM_NDC.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  aimRaycaster.setFromCamera(AIM_NDC, bundle.camera);
+  if (!aimRaycaster.ray.intersectPlane(aimPlane, aimPoint)) return;
+  const dx = aimPoint.x - cueBall().pos.x;
+  const dz = aimPoint.z - cueBall().pos.z;
+  if (Math.hypot(dx, dz) < 0.02) return;
+  aimDir.set(dx, 0, dz).normalize();
+  markDirty();
+}
+
+bundle.renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (e.button === 0 && state === 'aim') aimClickDown = { x: e.clientX, y: e.clientY };
+});
+
+window.addEventListener('pointerup', (e) => {
+  if (e.button !== 0 || !aimClickDown) return;
+  const moved = Math.hypot(e.clientX - aimClickDown.x, e.clientY - aimClickDown.y);
+  aimClickDown = null;
+  if (!placedBall && moved < AIM_CLICK_SLOP && state === 'aim') aimAtPoint(e);
+});
+
 let englishDrag: { x: number; y: number } | null = null;
 
 function applyTipDelta(daPx: number, dbPx: number): void {
@@ -295,7 +325,11 @@ window.addEventListener('pointerup', (e) => {
   }
 });
 
+const heldKeys = new Set<string>();
+window.addEventListener('blur', () => heldKeys.clear());
+
 window.addEventListener('keydown', (e) => {
+  heldKeys.add(e.code);
   if (e.code === 'Space') {
     e.preventDefault();
     shoot();
@@ -305,25 +339,21 @@ window.addEventListener('keydown', (e) => {
   } else if (e.code === 'ArrowDown') {
     e.preventDefault();
     adjustPower(e.shiftKey ? -1 : -POWER_STEP);
-  } else if (e.code === 'ArrowLeft') {
-    e.preventDefault();
-    rotateAim(e.shiftKey ? -AIM_FINE : -AIM_STEP);
-  } else if (e.code === 'ArrowRight') {
-    e.preventDefault();
-    rotateAim(e.shiftKey ? AIM_FINE : AIM_STEP);
   } else if (e.code === 'PageUp') {
     e.preventDefault();
     adjustElev(e.shiftKey ? 1 : 5);
   } else if (e.code === 'PageDown') {
     e.preventDefault();
     adjustElev(e.shiftKey ? -1 : -5);
-  } else if (e.code === 'KeyQ') rotateAim(e.shiftKey ? -AIM_FINE : -AIM_STEP);
-  else if (e.code === 'KeyE') rotateAim(e.shiftKey ? AIM_FINE : AIM_STEP);
-  else if (e.code === 'Digit1') setCamMode(1);
+  } else if (e.code === 'Digit1') setCamMode(1);
   else if (e.code === 'Digit2') setCamMode(2);
   else if (e.code === 'Digit3') setCamMode(3);
   else if (e.code === 'KeyR') reset();
   else if (e.code === 'KeyH') hud.toggleHelp();
+});
+
+window.addEventListener('keyup', (e) => {
+  heldKeys.delete(e.code);
 });
 
 entities.syncWorld(world);
@@ -334,6 +364,13 @@ const clock = new THREE.Clock();
 
 bundle.renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
+  if (state === 'aim') {
+    const fine = heldKeys.has('ShiftLeft') || heldKeys.has('ShiftRight');
+    let rot = 0;
+    if (heldKeys.has('ArrowLeft') || heldKeys.has('KeyQ')) rot -= fine ? AIM_ROT_FINE : AIM_ROT_SPEED;
+    if (heldKeys.has('ArrowRight') || heldKeys.has('KeyE')) rot += fine ? AIM_ROT_FINE : AIM_ROT_SPEED;
+    if (rot !== 0) rotateAim(rot * dt);
+  }
   if (state === 'run') {
     world.step(dt);
     entities.syncWorld(world);
