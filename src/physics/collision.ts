@@ -9,8 +9,8 @@ import {
   E_CUSHION,
   MU_THROW,
   MU_CUSHION,
-  CUSHION_HEIGHT_OFFSET,
   CUSHION_REACH,
+  CUSHION_DYN_ARM,
   POSITION_SLOP,
 } from './constants';
 import type { BallState } from './ball';
@@ -145,7 +145,7 @@ export function resolveCushion(ball: BallState, wall: Wall): void {
   const vn = ball.vel.dot(n);
   if (vn >= 0) return;
 
-  const c = CUSHION_HEIGHT_OFFSET;
+  const c = CUSHION_DYN_ARM;
   const h = CUSHION_REACH;
   T.crossVectors(UP_Y, n);
   RC.copy(n).multiplyScalar(-h);
