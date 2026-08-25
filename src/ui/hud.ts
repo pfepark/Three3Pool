@@ -13,6 +13,7 @@ export interface HudCallbacks {
 
 export interface Hud {
   setStatus: (text: string) => void;
+  setPredictionInfo: (text: string) => void;
   setPower: (p: number) => void;
   setTip: (a: number, b: number) => void;
   setElev: (deg: number) => void;
@@ -31,6 +32,7 @@ export function createHud(root: HTMLElement, cbs: HudCallbacks): Hud {
   injectStyles();
 
   const status = el('status');
+  const predInfo = el('predinfo');
   const panel = el('panel');
 
   const powerLabel = el('label');
@@ -84,7 +86,7 @@ export function createHud(root: HTMLElement, cbs: HudCallbacks): Hud {
     '카메라: <b>1</b> 탑다운 · <b>2</b> 큐 뒤 · <b>3</b> 자유<br>휠 줌 · 우클릭 드래그 = 타격점<br>PgUp/PgDn = 큐 각도(커브)';
   panel.append(powerWrap, elevWrap, padWrap, btnRow, cueBlock, camLabel);
 
-  root.append(status, panel);
+  root.append(status, predInfo, panel);
   root.classList.add('hud-root');
 
   let power = 50;
@@ -207,6 +209,9 @@ export function createHud(root: HTMLElement, cbs: HudCallbacks): Hud {
     setStatus: (t) => {
       status.textContent = t;
     },
+    setPredictionInfo: (t) => {
+      predInfo.textContent = t;
+    },
     setPower: (p) => {
       power = p;
       powerSlider.value = String(p);
@@ -250,6 +255,7 @@ function injectStyles(): void {
   style.textContent = `
     .hud-root { position: fixed; inset: 0; pointer-events: none; font-family: system-ui, sans-serif; color: #dde3ee; z-index: 10; }
     .hud-root .status { position: absolute; top: 12px; left: 14px; background: rgba(10,13,20,.72); padding: 7px 11px; border-radius: 8px; font-size: 13px; }
+    .hud-root .predinfo { position: absolute; top: 48px; left: 14px; background: rgba(10,13,20,.55); padding: 4px 10px; border-radius: 6px; font-size: 12px; color: #9fc2e8; }
     .hud-root .panel { position: absolute; top: 12px; right: 14px; width: 190px; background: rgba(10,13,20,.78); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
     .hud-root .panel.hidden-panel { display: none; }
     .hud-root .block { display: flex; flex-direction: column; gap: 5px; }

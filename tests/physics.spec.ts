@@ -239,6 +239,63 @@ describe('elevated cue curve (커브/스웨브)', () => {
   });
 });
 
+describe('lesson techniques', () => {
+  function sideThroughObject(bFactor: number): {
+    wyAfterHit: number;
+    hitBall: boolean;
+    finalPos: THREE.Vector3;
+  } {
+    const w = World.initial();
+    const cue = w.ballById('white');
+    const obj = w.ballById('red');
+    cue.pos.set(0, UP_R, 0);
+    obj.pos.set(0.42, UP_R, -0.03);
+    parkOthers(w, cue, obj);
+    applyStrike(cue, {
+      dir: new THREE.Vector3(1, 0, 0),
+      Vcue: 6,
+      a: 0,
+      b: bFactor,
+    });
+    let wyAfterHit: number | null = null;
+    for (let t = 0; t < 2.5; ) {
+      const dt = 0.002;
+      w.step(dt, (ev) => {
+        if (ev.kind === 'ball' && wyAfterHit === null && (w.balls[ev.i].id === 'white' || w.balls[ev.j].id === 'white')) {
+          wyAfterHit = cue.omega.y;
+        }
+      });
+      t += dt;
+    }
+    return { wyAfterHit: wyAfterHit ?? 0, hitBall: wyAfterHit !== null, finalPos: cue.pos.clone() };
+  }
+
+  it('옆돌리기: english survives object contact and changes outcome', () => {
+    const withEnglish = sideThroughObject(0.45 * BALL_RADIUS);
+    const noEnglish = sideThroughObject(0);
+    expect(withEnglish.hitBall).toBe(true);
+    expect(Math.abs(withEnglish.wyAfterHit)).toBeGreaterThan(50);
+    const spread = withEnglish.finalPos.distanceTo(noEnglish.finalPos);
+    expect(spread).toBeGreaterThan(0.15);
+  });
+
+  it('역회전 뱅크: backspin shortens travel after cushion', () => {
+    function bankX(spinZ: number): number {
+      const w = World.initial();
+      const cue = w.ballById('white');
+      parkOthers(w, cue);
+      cue.pos.set(0.6, UP_R, 0);
+      cue.vel.set(2.5, 0, 0);
+      cue.omega.set(0, 0, spinZ);
+      for (let t = 0; t < 1.5; t += 1 / 60) w.step(1 / 60);
+      return cue.pos.x;
+    }
+    const rolling = bankX(-2.5 / BALL_RADIUS);
+    const backspin = bankX(50);
+    expect(backspin).toBeGreaterThan(rolling + 0.15);
+  });
+});
+
 describe('determinism', () => {
   it('identical inputs produce bit-identical outcomes', () => {
     const w1 = World.initial();

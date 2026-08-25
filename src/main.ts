@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALL_RADIUS } from './physics/constants';
+import { BALL_RADIUS, PLAY_W, PLAY_H } from './physics/constants';
 import { World } from './physics/world';
 import { applyStrike } from './physics/strike';
 import { predict, type Prediction } from './physics/predict';
@@ -86,7 +86,16 @@ function markDirty(): void {
 function refreshPrediction(): void {
   currentPrediction = predict(world, strikeParams());
   entities.updatePrediction(currentPrediction);
-  entities.setCueAim(cueBall().pos, aimDir, 0.03 + power * 0.0018, true, (elevDeg * Math.PI) / 180);
+  entities.setCueAim(
+    cueBall().pos,
+    aimDir,
+    0.03 + power * 0.0018,
+    true,
+    (elevDeg * Math.PI) / 180,
+  );
+  hud.setPredictionInfo(
+    `예측: 쿠션 ${currentPrediction.cushionCount}회 · 첫 충돌 ${currentPrediction.ghost ? '있음' : '없음'}`,
+  );
   predictionDirty = false;
 }
 
@@ -98,6 +107,7 @@ function shoot(): void {
   entities.setCueAim(cue.pos, aimDir, 0, false);
   entities.updatePrediction(null);
   currentPrediction = null;
+  hud.setPredictionInfo('');
   hud.setStatus('구르는 중...');
 }
 
@@ -210,6 +220,79 @@ window.addEventListener('pointermove', (e) => {
 
 window.addEventListener('pointerup', (e) => {
   if (e.button === 2) englishDrag = null;
+});
+
+const placeRaycaster = new THREE.Raycaster();
+const placePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -BALL_RADIUS);
+const placePoint = new THREE.Vector3();
+const PLACE_NDC = new THREE.Vector2();
+let placedBall: BallState | null = null;
+
+function ballAtPointer(e: PointerEvent): BallState | null {
+  PLACE_NDC.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  placeRaycaster.setFromCamera(PLACE_NDC, bundle.camera);
+  if (!placeRaycaster.ray.intersectPlane(placePlane, placePoint)) return null;
+  let best: BallState | null = null;
+  let bestD = BALL_RADIUS * 2;
+  for (const b of world.balls) {
+    const dx = b.pos.x - placePoint.x;
+    const dz = b.pos.z - placePoint.z;
+    const d = Math.hypot(dx, dz);
+    if (d <= bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  return best;
+}
+
+function tryPlace(b: BallState, x: number, z: number): boolean {
+  const limX = PLAY_W / 2 - BALL_RADIUS - 0.002;
+  const limZ = PLAY_H / 2 - BALL_RADIUS - 0.002;
+  const cx = Math.min(limX, Math.max(-limX, x));
+  const cz = Math.min(limZ, Math.max(-limZ, z));
+  for (const o of world.balls) {
+    if (o === b) continue;
+    if ((o.pos.x - cx) ** 2 + (o.pos.z - cz) ** 2 < (2 * BALL_RADIUS + 0.001) ** 2) return false;
+  }
+  b.pos.x = cx;
+  b.pos.z = cz;
+  return true;
+}
+
+bundle.renderer.domElement.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (state !== 'aim' || e.button !== 0 || placedBall || englishDrag) return;
+    const b = ballAtPointer(e);
+    if (!b) return;
+    e.stopPropagation();
+    placedBall = b;
+    bundle.controls.enabled = false;
+    bundle.renderer.domElement.style.cursor = 'grabbing';
+  },
+  true,
+);
+
+window.addEventListener('pointermove', (e) => {
+  if (!placedBall) return;
+  PLACE_NDC.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  placeRaycaster.setFromCamera(PLACE_NDC, bundle.camera);
+  if (placeRaycaster.ray.intersectPlane(placePlane, placePoint)) {
+    if (tryPlace(placedBall, placePoint.x, placePoint.z)) {
+      entities.syncWorld(world);
+      markDirty();
+    }
+  }
+});
+
+window.addEventListener('pointerup', (e) => {
+  if (e.button === 0 && placedBall) {
+    placedBall = null;
+    bundle.renderer.domElement.style.cursor = '';
+    if (camMode === 3) bundle.controls.enabled = true;
+    markDirty();
+  }
 });
 
 window.addEventListener('keydown', (e) => {

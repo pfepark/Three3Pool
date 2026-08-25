@@ -9,12 +9,13 @@ export interface Prediction {
   objectPaths: { id: BallId; points: THREE.Vector3[] }[];
   ghost: THREE.Vector3 | null;
   ghostBallId: BallId | null;
+  cushionCount: number;
 }
 
 export type PredictParams = StrikeParams & { cueId?: BallId };
 
 const SAMPLE_DT = 1 / 60;
-const HORIZON = 1.8;
+const HORIZON = 3.0;
 
 export function predict(world: World, params: PredictParams): Prediction {
   const sim = world.clone();
@@ -27,9 +28,14 @@ export function predict(world: World, params: PredictParams): Prediction {
   let ghost: THREE.Vector3 | null = null;
   let ghostBallId: BallId | null = null;
   let contactIndex = -1;
+  let cushionCount = 0;
 
   const onCollision = (ev: CollisionEvent): void => {
-    if (contactIndex >= 0 || ev.kind !== 'ball') return;
+    if (ev.kind === 'cushion') {
+      cushionCount++;
+      return;
+    }
+    if (contactIndex >= 0) return;
     const idA = sim.balls[ev.i].id;
     const idB = sim.balls[ev.j].id;
     if (idA !== cue.id && idB !== cue.id) return;
@@ -55,7 +61,7 @@ export function predict(world: World, params: PredictParams): Prediction {
     }
   }
 
-  return { cuePath, objectPaths, ghost, ghostBallId };
+  return { cuePath, objectPaths, ghost, ghostBallId, cushionCount };
 }
 
 function trimTail(path: THREE.Vector3[]): THREE.Vector3[] {
