@@ -118,6 +118,33 @@ describe('draw shot', () => {
     for (let t = 0; t < 0.12; t += 0.002) w.step(0.002);
     expect(cue.vel.x).toBeLessThan(-0.02);
   });
+
+  it('최대 끌어치기: 정면 타격 후 테이블 반대편까지 역주행', () => {
+    const w = World.initial();
+    const cue = w.ballById('white');
+    const obj = w.ballById('red');
+    cue.pos.set(0, UP_R, 0);
+    obj.pos.set(0.5, UP_R, 0);
+    parkOthers(w, cue, obj);
+    applyStrike(cue, {
+      dir: new THREE.Vector3(1, 0, 0),
+      Vcue: 9,
+      a: -0.45 * BALL_RADIUS,
+      b: 0,
+    });
+    let hit = false;
+    let minX = 0;
+    for (let t = 0; t < 12 && !w.isSettled(); ) {
+      w.step(1 / 60, (ev) => {
+        if (ev.kind === 'ball') hit = true;
+      });
+      if (hit) minX = Math.min(minX, cue.pos.x);
+      t += 1 / 60;
+    }
+    expect(hit).toBe(true);
+    expect(minX).toBeLessThan(-1.2);
+    expect(obj.pos.x).toBeGreaterThan(0.5);
+  });
 });
 
 describe('cut + draw (뒤돌려치기)', () => {
